@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Poetry App</title>
+  <style>
+    body {
+      background-color: #f5f0e6;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: #f5f0e6;
+      padding: 20px;
+      border-right: 2px solid #d4a373;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      padding: 20px;
+    }
+
+    .search-bar {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d4a373;
+      border-radius: 5px;
+      background-color: #e6f0ff;
+    }
+
+    .button {
+      background-color: #a67c52;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .button:hover {
+      background-color: #8c6239;
+    }
+
+    .collection-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      background-color: #fff4dc;
+      padding: 6px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .collection-item span {
+      flex-grow: 1;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: red;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* Popup overlay */
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.4);
+      justify-content: center;
+      align-items: center;
+    }
+
+    #popup {
+      background-color: #fffefc;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    }
+
+    #popup input {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 10px;
+      border: 1px solid #d4a373;
+      border-radius: 5px;
+    }
+
+    #loading-screen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      justify-content: center;
+      align-items: center;
+    }
+
+    #loading-screen span {
+      color: white;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Popup -->
+  <div id="overlay">
+    <div id="popup">
+      <h3>New Collection</h3>
+      <input type="text" id="collection-name" placeholder="Enter collection name" />
+      <button class="button" onclick="addCollection()">Add</button>
+    </div>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <span>Loading...</span>
+  </div>
+
+  <div class="container">
+    <div class="sidebar">
+      <h3>Collections</h3>
+      <ul id="collections-list" style="list-style: none; padding: 0;"></ul>
+      <button class="button" onclick="showPopup()">+ New Collection</button>
+    </div>
+    <div class="main-content" id="main-content">
+      <input type="text" class="search-bar" placeholder="Search Poetry..." id="search" onkeyup="searchPoetry()" />
+      <div id="poetry-display" style="margin-top: 20px;">
+        <!-- Poetry will be shown here -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isSearching = false;
+
+    function getCSRFToken() {
+      return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    function searchPoetry() {
+  if (isSearching) return; // Prevent multiple calls
+  isSearching = true;
+
+  const query = document.getElementById("search").value.trim();
+
+  // Show loading screen
+  document.getElementById("loading-screen").style.display = "flex";
+
+  // Clear previous results
+  document.getElementById("poetry-display").innerHTML = '';
+
+  fetch(`/search_poetry/?q=${encodeURIComponent(query)}`)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      // Hide loading screen
+      document.getElementById("loading-screen").style.display = "none";
+      isSearching = false;
+
+      const display = document.getElementById("poetry-display");
+
+      // If no results from Rekhta or the database
+      if (data.results && data.results.length === 0 && !data.transcription) {
+        display.innerHTML = "<p>No poetry found.</p>";
+        return;
+      }
+
+      // Show results from Rekhta or the database
+      if (data.results && data.results.length > 0) {
+        display.innerHTML = data.results.map(item => `
+          <div style="cursor:pointer;" onclick="showPoetryPopup('${item.title}', '${item.author}', '${item.content}')">
+            <h4>${item.title}</h4>
+            <p>${item.content.slice(0, 100)}...</p>
+          </div>
+        `).join('');
+      }
+
+      // If transcription exists, display it as a poetry result
+      if (data.transcription) {
+        const refinedPoetry = formatTranscription(data.transcription);
+        display.innerHTML += `
+          <div style="cursor:pointer;" onclick="showPoetryPopup('Transcribed Poetry', 'Unknown', '${refinedPoetry}')">
+            <h4>Transcribed Poetry</h4>
+            <p>${refinedPoetry.slice(0, 100)}...</p>
+          </div>
+        `;
+      }
+    })
+    .catch((error) => {
+      // Hide loading screen in case of error
+      document.getElementById("loading-screen").style.display = "none";
+      console.error("Error during fetch:", error);
+      document.getElementById("poetry-display").innerHTML = "<p>Error fetching poetry.</p>";
+      isSearching = false;
+    });
+}
+// Utility function to format transcription text
+function formatTranscription(text) {
+  // Assuming you need to format the Urdu transcription here
+  return text.replace(/\n/g, '<br>'); // Example to handle line breaks, adjust as needed
+}
+
+
+    function showPopup() {
+      document.getElementById("overlay").style.display = "flex";
+    }
+
+    function hidePopup() {
+      document.getElementById("overlay").style.display = "none";
+    }
+
+    function addCollection() {
+      const name = document.getElementById("collection-name").value.trim();
+      if (!name) return;
+
+      const li = document.createElement("li");
+      li.className = "collection-item";
+
+      const span = document.createElement("span");
+      span.textContent = name;
+      span.onclick = function () {
+        loadPoetry(name);
+      };
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.textContent = "×";
+      delBtn.onclick = function (e) {
+        e.stopPropagation();
+        li.remove();
+      };
+
+      li.appendChild(span);
+      li.appendChild(delBtn);
+      document.getElementById("collections-list").appendChild(li);
+      document.getElementById("collection-name").value = "";
+      hidePopup();
+    }
+
+    function loadPoetry(collectionName) {
+      const poetryDisplay = document.getElementById("main-content");
+      poetryDisplay.innerHTML = `
+        <div id="poetry-view">
+          <h2>${collectionName} Collection</h2>
+          <p>Poetry from the <strong>${collectionName}</strong> collection will appear here.</p>
+          <button class="button" onclick="backToSearch()">Back to Search</button>
+        </div>
+      `;
+    }
+
+    function backToSearch() {
+      const poetryDisplay = document.getElementById("main-content");
+      poetryDisplay.innerHTML = `
+        <input type="text" class="search-bar" placeholder="Search Poetry..." id="search" onkeyup="searchPoetry()" />
+        <div id="poetry-display" style="margin-top: 20px;"></div>
+      `;
+    }
+
+    function showPoetryPopup(title, author, content) {
+      document.getElementById('poetry-popup-title').innerText = title || "Untitled";
+      document.getElementById('poetry-popup-author').innerText = author ? `By ${author}` : "";
+      document.getElementById('poetry-popup-content').innerText = content;
+
+      document.getElementById('poetry-popup-overlay').style.display = 'flex';
+    }
+
+    function hidePoetryPopup() {
+      document.getElementById('poetry-popup-overlay').style.display = 'none';
+    }
+
+    function addToCollectionFromPopup() {
+      const title = document.getElementById("poetry-popup-title").textContent;
+      const content = document.getElementById("poetry-popup-content").textContent;
+
+      const li = document.createElement("li");
+      li.className = "collection-item";
+
+      const span = document.createElement("span");
+      span.textContent = title;
+      span.onclick = function () {
+        showFullPoetryInMain(title, content);
+      };
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.textContent = "×";
+      delBtn.onclick = function (e) {
+        e.stopPropagation();
+        li.remove();
+      };
+
+      li.appendChild(span);
+      li.appendChild(delBtn);
+      document.getElementById("collections-list").appendChild(li);
+      hidePoetryPopup();
+    }
+
+    function showFullPoetryInMain(title, content) {
+      const display = document.getElementById("main-content");
+      display.innerHTML = `
+        <h2>${title}</h2>
+        <p>${content}</p>
+        <button class="button" onclick="backToSearch()">Back</button>
+      `;
+    }
+  </script>
+
+  <div id="poetry-popup-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content:center; align-items:center;">
+    <div id="poetry-popup" style="background:#fffefc; padding:20px; border-radius:10px; width:80%; max-width:600px; box-shadow: 0 0 15px rgba(0,0,0,0.3);">
+      <h3 id="poetry-popup-title"></h3>
+      <p id="poetry-popup-author" style="font-style: italic; color:#555;"></p>
+      <div id="poetry-popup-content" style="margin-top:10px; white-space:pre-line;"></div>
+      <button class="button" onclick="addToCollectionFromPopup()">Add to Collection</button>
+      <button class="button" onclick="hidePoetryPopup()" style="background-color: #ccc; color:#333;">Close</button>
+    </div>
+  </div>
+
+</body>
+</html>

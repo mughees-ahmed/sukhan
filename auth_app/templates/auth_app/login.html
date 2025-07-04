@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Poetry App</title>
+    <style>
+        body {
+            background: #f5f0e1;
+            color: #4a4a4a;
+            font-family: 'Georgia', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 22px;
+            font-style: italic;
+            color: #8b5e3b;
+        }
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #d4c4a1;
+            border-radius: 5px;
+            background: #faf5ee;
+            color: #4a4a4a;
+            outline: none;
+            font-size: 14px;
+        }
+        .input-field:focus {
+            border-color: #8b5e3b;
+        }
+        .login-btn, .register-btn {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #8b5e3b;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .login-btn:hover, .register-btn:hover {
+            background: #a77450;
+        }
+        .error-message {
+            color: red;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .register-btn {
+            background: #4a90e2;
+            margin-top: 5px;
+        }
+        .register-btn:hover {
+            background: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Poetry App</h2>
+
+        {% if messages %}
+            <div class="error-message">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="POST" action="/login/">
+            {% csrf_token %}
+            <input type="text" name="username" placeholder="Username" class="input-field" required>
+            <input type="password" name="password" placeholder="Password" class="input-field" required>
+            <button type="submit" class="login-btn">Login</button>
+        </form>
+
+        <form action=" /register/" method="GET">
+            <button type="submit" class="register-btn">Don't have an account? Register</button>
+        </form>
+    </div>
+</body>
+</html>
